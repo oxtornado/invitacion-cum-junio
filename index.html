@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Office Birthday Maze</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            touch-action: manipulation;
+            user-select: none;
+        }
+
+        .game-container {
+            background: #2c3e50;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 95vw;
+            max-height: 95vh;
+        }
+
+        .game-header {
+            text-align: center;
+            color: #ecf0f1;
+            margin-bottom: 15px;
+        }
+
+        .game-header h1 {
+            font-size: 18px;
+            margin-bottom: 5px;
+            color: #f39c12;
+        }
+
+        .game-header p {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        #gameCanvas {
+            border: 3px solid #34495e;
+            border-radius: 8px;
+            background: #ecf0f1;
+            display: block;
+            margin: 0 auto;
+            touch-action: none;
+        }
+
+        .controls {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px 60px;
+            gap: 5px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .dpad-btn {
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            transition: all 0.1s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .dpad-btn:active {
+            transform: translateY(2px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            background: linear-gradient(145deg, #2980b9, #3498db);
+        }
+
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 3; }
+
+        .victory-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .victory-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            color: white;
+            max-width: 90%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            animation: bounceIn 0.6s ease-out;
+        }
+
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .victory-content h2 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #f39c12;
+        }
+
+        .victory-content p {
+            font-size: 18px;
+            line-height: 1.4;
+        }
+
+        #restartBtn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            margin-top: 20px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        #restartBtn:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <h1>🏢 Office Birthday Maze 🎉</h1>
+            <p>¡Ayuda al oficinista a llegar a la celebración!</p>
+        </div>
+        
+        <canvas id="gameCanvas" width="300" height="300"></canvas>
+        
+        <div class="controls">
+            <div class="dpad">
+                <button class="dpad-btn btn-up">↑</button>
+                <button class="dpad-btn btn-left">←</button>
+                <button class="dpad-btn btn-right">→</button>
+                <button class="dpad-btn btn-down">↓</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="victory-modal" id="victoryModal">
+        <div class="victory-content">
+            <h2>🎉 ¡Felicidades! 🎉</h2>
+            <p>Te invitamos a celebrar los cumpleaños del mes de junio.<br><strong>¡Lleva tu aporte!</strong></p>
+            <button id="restartBtn">Jugar de Nuevo</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game settings
+        const CELL_SIZE = 30;
+        const COLS = 10;
+        const ROWS = 10;
+        
+        // Player settings
+        let player = {
+            x: 1,
+            y: 1,
+            celebrating: false,
+            jumpOffset: 0,
+            smiling: false
+        };
+
+        // Short maze layout (0 = wall, 1 = path, 2 = goal)
+        const maze = [
+            [0,0,0,0,0,0,0,0,0,0],
+            [0,1,1,1,0,1,1,1,1,0],
+            [0,1,0,1,0,1,0,0,1,0],
+            [0,1,0,1,1,1,1,0,1,0],
+            [0,1,0,0,0,0,1,0,1,0],
+            [0,1,1,1,1,0,1,1,1,0],
+            [0,0,0,0,1,0,0,0,1,0],
+            [0,1,1,1,1,1,1,0,1,0],
+            [0,1,0,0,0,0,1,0,2,0],
+            [0,0,0,0,0,0,0,0,0,0]
+        ];
+
+        function drawPixelArt() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw maze
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const x = col * CELL_SIZE;
+                    const y = row * CELL_SIZE;
+                    
+                    if (maze[row][col] === 0) {
+                        // Wall - cubicle style
+                        ctx.fillStyle = '#34495e';
+                        ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                        ctx.fillStyle = '#2c3e50';
+                        ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+                    } else if (maze[row][col] === 1) {
+                        // Path - office floor
+                        ctx.fillStyle = '#ecf0f1';
+                        ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                        ctx.fillStyle = '#bdc3c7';
+                        ctx.fillRect(x + 8, y + 8, 3, 3);
+                        ctx.fillRect(x + 18, y + 18, 3, 3);
+                    } else if (maze[row][col] === 2) {
+                        // Goal - party area
+                        ctx.fillStyle = '#f39c12';
+                        ctx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+                        ctx.fillStyle = '#e67e22';
+                        ctx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+                        // Party decorations
+                        ctx.fillStyle = '#e74c3c';
+                        ctx.fillRect(x + 8, y + 5, 3, 3);
+                        ctx.fillStyle = '#3498db';
+                        ctx.fillRect(x + 18, y + 10, 3, 3);
+                        ctx.fillStyle = '#2ecc71';
+                        ctx.fillRect(x + 6, y + 20, 3, 3);
+                    }
+                }
+            }
+            
+            // Draw office guy
+            const playerX = player.x * CELL_SIZE;
+            const playerY = player.y * CELL_SIZE - player.jumpOffset;
+            
+            // Body (shirt)
+            ctx.fillStyle = '#3498db';
+            ctx.fillRect(playerX + 9, playerY + 12, 12, 12);
+            
+            // Head
+            ctx.fillStyle = '#f4d1c1';
+            ctx.fillRect(playerX + 10, playerY + 3, 10, 9);
+            
+            // Hair
+            ctx.fillStyle = '#8b4513';
+            ctx.fillRect(playerX + 10, playerY + 3, 10, 4);
+            
+            // Eyes
+            ctx.fillStyle = '#000';
+            ctx.fillRect(playerX + 12, playerY + 6, 2, 2);
+            ctx.fillRect(playerX + 16, playerY + 6, 2, 2);
+            
+            // Smile (when celebrating)
+            if (player.smiling) {
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(playerX + 12, playerY + 9, 6, 2);
+            }
+            
+            // Tie
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(playerX + 13, playerY + 12, 4, 6);
+            
+            // Arms
+            ctx.fillStyle = '#f4d1c1';
+            ctx.fillRect(playerX + 6, playerY + 13, 3, 6);
+            ctx.fillRect(playerX + 21, playerY + 13, 3, 6);
+            
+            // Legs
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillRect(playerX + 10, playerY + 24, 3, 6);
+            ctx.fillRect(playerX + 17, playerY + 24, 3, 6);
+        }
+
+        function movePlayer(dx, dy) {
+            if (player.celebrating) return;
+            
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+            
+            if (newX >= 0 && newX < COLS && newY >= 0 && newY < ROWS && maze[newY][newX] !== 0) {
+                player.x = newX;
+                player.y = newY;
+                
+                if (maze[newY][newX] === 2) {
+                    startCelebration();
+                }
+            }
+            drawPixelArt();
+        }
+
+        function startCelebration() {
+            player.celebrating = true;
+            player.smiling = true;
+            
+            // Jump animation
+            let jumpHeight = 0;
+            let jumpDirection = 1;
+            
+            const jumpAnimation = setInterval(() => {
+                jumpHeight += jumpDirection * 3;
+                if (jumpHeight >= 15) jumpDirection = -1;
+                if (jumpHeight <= 0) {
+                    jumpHeight = 0;
+                    jumpDirection = 0;
+                    clearInterval(jumpAnimation);
+                    
+                    // Show victory modal after jump
+                    setTimeout(() => {
+                        document.getElementById('victoryModal').style.display = 'flex';
+                    }, 500);
+                }
+                player.jumpOffset = jumpHeight;
+                drawPixelArt();
+            }, 50);
+        }
+
+        function resetGame() {
+            player = {
+                x: 1,
+                y: 1,
+                celebrating: false,
+                jumpOffset: 0,
+                smiling: false
+            };
+            document.getElementById('victoryModal').style.display = 'none';
+            drawPixelArt();
+        }
+
+        // Initialize game first
+        drawPixelArt();
+
+        // Button controls - wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            const upBtn = document.querySelector('.btn-up');
+            const downBtn = document.querySelector('.btn-down');
+            const leftBtn = document.querySelector('.btn-left');
+            const rightBtn = document.querySelector('.btn-right');
+            
+            if (upBtn) {
+                upBtn.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    console.log('Up pressed');
+                    movePlayer(0, -1);
+                });
+                upBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Up clicked');
+                    movePlayer(0, -1);
+                });
+            }
+            
+            if (downBtn) {
+                downBtn.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    console.log('Down pressed');
+                    movePlayer(0, 1);
+                });
+                downBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Down clicked');
+                    movePlayer(0, 1);
+                });
+            }
+            
+            if (leftBtn) {
+                leftBtn.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    console.log('Left pressed');
+                    movePlayer(-1, 0);
+                });
+                leftBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Left clicked');
+                    movePlayer(-1, 0);
+                });
+            }
+            
+            if (rightBtn) {
+                rightBtn.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    console.log('Right pressed');
+                    movePlayer(1, 0);
+                });
+                rightBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('Right clicked');
+                    movePlayer(1, 0);
+                });
+            }
+        });
+
+        // Also add immediate event listeners in case DOM is already loaded
+        const upBtn = document.querySelector('.btn-up');
+        const downBtn = document.querySelector('.btn-down');
+        const leftBtn = document.querySelector('.btn-left');
+        const rightBtn = document.querySelector('.btn-right');
+        
+        if (upBtn) {
+            upBtn.onclick = function() { movePlayer(0, -1); };
+            upBtn.ontouchstart = function(e) { e.preventDefault(); movePlayer(0, -1); };
+        }
+        if (downBtn) {
+            downBtn.onclick = function() { movePlayer(0, 1); };
+            downBtn.ontouchstart = function(e) { e.preventDefault(); movePlayer(0, 1); };
+        }
+        if (leftBtn) {
+            leftBtn.onclick = function() { movePlayer(-1, 0); };
+            leftBtn.ontouchstart = function(e) { e.preventDefault(); movePlayer(-1, 0); };
+        }
+        if (rightBtn) {
+            rightBtn.onclick = function() { movePlayer(1, 0); };
+            rightBtn.ontouchstart = function(e) { e.preventDefault(); movePlayer(1, 0); };
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp': movePlayer(0, -1); break;
+                case 'ArrowDown': movePlayer(0, 1); break;
+                case 'ArrowLeft': movePlayer(-1, 0); break;
+                case 'ArrowRight': movePlayer(1, 0); break;
+            }
+        });
+
+        // Restart button
+        document.getElementById('restartBtn').addEventListener('click', resetGame);
+
+        // Swipe controls on canvas
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const deltaX = touchEndX - touchStartX;
+            const deltaY = touchEndY - touchStartY;
+            
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 30) {
+                if (deltaX > 0) movePlayer(1, 0);
+                else movePlayer(-1, 0);
+            } else if (Math.abs(deltaY) > 30) {
+                if (deltaY > 0) movePlayer(0, 1);
+                else movePlayer(0, -1);
+            }
+        });
+    </script>
+</body>
+</html>
